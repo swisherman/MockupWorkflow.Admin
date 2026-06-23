@@ -10,5 +10,9 @@ namespace MockupWorkflow.Admin.Web.Services
         {
             _httpClient = httpClient;
         }
+        public async Task<string> GetHealthAsync()
+        {
+            return await _httpClient.GetStringAsync("/");
+        }
     }
 }

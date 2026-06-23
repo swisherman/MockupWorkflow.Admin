@@ -15,6 +15,9 @@ builder.Services.AddHttpClient<RecordsApiClient>((sp, client) =>
         configuration["WorkflowApi:BaseUrl"]!);
 });
 
+
+
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
