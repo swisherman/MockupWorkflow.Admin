@@ -9,6 +9,15 @@
 *.userosscache
 *.sln.docstates
 
+# wwwroot
+*.slnx
+src/MockupWorkflow.Admin.Web/wwwroot/
+
+
+
+
+
+
 # Rider
 .idea/
 
