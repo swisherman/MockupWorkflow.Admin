@@ -1,10 +1,19 @@
 using MockupWorkflow.Admin.Web.Components;
+using MockupWorkflow.Admin.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddHttpClient<RecordsApiClient>((sp, client) =>
+{
+    var configuration = sp.GetRequiredService<IConfiguration>();
+
+    client.BaseAddress = new Uri(
+        configuration["WorkflowApi:BaseUrl"]!);
+});
 
 var app = builder.Build();
 
