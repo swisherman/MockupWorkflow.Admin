@@ -1,22 +1,44 @@
 ﻿@page "/import"
 @using System.Text.Json
+@using MudBlazor
 @using MockupWorkflow.Shared.Models;
 @using MockupWorkflow.Admin.Web.Models
 @using MockupWorkflow.Admin.Web.Services
 @inject RecordsApiClient RecordsApiClient
 
+
 <h3>Import POD Items</h3>
 
 <p>Paste a JSON array of PODItems below.</p>
 
-<textarea @bind="JsonText" rows="20" style="width:100%;"></textarea>
+<MudTextField T="string"
+              Label="POD Items JSON"
+              @bind-Value="JsonText"
+              Lines="20"
+              Variant="Variant.Outlined"
+              FullWidth="true"
+              AutoGrow="false" />
 
+<MudSelect T="string"
+           Label="Product Type"
+           @bind-Value="productType">
+
+    <MudSelectItem Value="@("tshirt")">T-Shirt</MudSelectItem>
+    <MudSelectItem Value="@("mug")">Mug</MudSelectItem>
+    <MudSelectItem Value="@("hoodie")">Hoodie</MudSelectItem>
+    <MudSelectItem Value="@("sweatshirt")">Sweatshirt</MudSelectItem>
+
+
+</MudSelect>
 <br />
 <br />
 
-<button @onclick="ImportItems" disabled="@IsImporting">
+<MudButton Variant="Variant.Filled"
+           Color="Color.Primary"
+           OnClick="ImportItems"
+           Disabled="@IsImporting">
     @(IsImporting ? "Importing..." : "Import")
-</button>
+</MudButton>
 
 @if (!string.IsNullOrWhiteSpace(Message))
 {
@@ -24,6 +46,8 @@
 }
 
 @code {
+    private string batchId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+    private string productType = "tshirt";
     private string JsonText = """
     [
       {
@@ -45,6 +69,7 @@
         {
             IsImporting = true;
             Message = string.Empty;
+            batchId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
 
             var items = JsonSerializer.Deserialize<List<PodItem>>(
                 JsonText,
@@ -52,6 +77,21 @@
                 {
                     PropertyNameCaseInsensitive = true
                 });
+            if (items != null)
+            {
+                foreach (var item in items)
+                {
+                    item.BatchId = batchId;
+                    item.ProductType = productType;
+                    if (string.IsNullOrWhiteSpace(item.FolderName))
+                        item.FolderName = item.Phrase.Replace(" ", ".");
+                    item.MockupRoot = "/data/builds";
+                    item.ExpectedFolderName = item.FolderName;
+
+                    item.SourceKey = $"{item.BatchId}:{item.ProductType}:{item.FolderName}";
+                }
+            }
+
 
             if (items == null || items.Count == 0)
             {

@@ -1,5 +1,6 @@
 using MockupWorkflow.Admin.Web.Components;
 using MockupWorkflow.Admin.Web.Services;
+using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddAntiforgery(options =>
@@ -12,6 +13,11 @@ builder.Services.AddAntiforgery(options =>
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Add MudBlazor services
+builder.Services.AddMudServices();
+
+// Register TimeProvider
+builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddHttpClient<RecordsApiClient>((sp, client) =>
 {
