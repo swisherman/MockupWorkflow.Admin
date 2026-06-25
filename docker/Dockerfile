@@ -3,13 +3,10 @@ WORKDIR /src
 
 ARG BUILD_CONFIGURATION=Debug
 
-
 COPY ["MockupWorkflow.Admin/src/MockupWorkflow.Admin.Web/MockupWorkflow.Admin.Web.csproj", "MockupWorkflow.Admin/src/MockupWorkflow.Admin.Web/"]
-COPY ["MockupWorkflow.Shared/MockupWorkflow.Shared/MockupWorkflow.Shared.csproj", "MockupWorkflow.Shared/MockupWorkflow.Shared/"]
-
+COPY ["MockupWorkflow.Shared/src/MockupWorkflow.Shared/MockupWorkflow.Shared.csproj", "MockupWorkflow.Shared/src/MockupWorkflow.Shared/"]
 
 RUN dotnet restore "MockupWorkflow.Admin/src/MockupWorkflow.Admin.Web/MockupWorkflow.Admin.Web.csproj"
-
 COPY . .
 
 WORKDIR "/src/MockupWorkflow.Admin/src/MockupWorkflow.Admin.Web"
