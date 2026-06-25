@@ -1,11 +1,86 @@
 ﻿@page "/import"
-
-<PageTitle>Import POD Items</PageTitle>
+@using System.Text.Json
+@using MockupWorkflow.Shared.Models;
+@using MockupWorkflow.Admin.Web.Models
+@using MockupWorkflow.Admin.Web.Services
+@inject RecordsApiClient RecordsApiClient
 
 <h3>Import POD Items</h3>
 
-<textarea rows="20" cols="100"></textarea>
+<p>Paste a JSON array of PODItems below.</p>
+
+<textarea @bind="JsonText" rows="20" style="width:100%;"></textarea>
 
 <br />
+<br />
 
-<button>Import</button>
+<button @onclick="ImportItems" disabled="@IsImporting">
+    @(IsImporting ? "Importing..." : "Import")
+</button>
+
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <p>@Message</p>
+}
+
+@code {
+    private string JsonText = """
+    [
+      {
+        "sourceKey": "coffee-until-further-notice",
+        "phrase": "Coffee Until Further Notice",
+        "fileName": "coffee-until-further-notice",
+        "category": "shirts",
+        "status": "Ready"
+      }
+    ]
+    """;
+
+    private string Message = string.Empty;
+    private bool IsImporting;
+
+    private async Task ImportItems()
+    {
+        try
+        {
+            IsImporting = true;
+            Message = string.Empty;
+
+            var items = JsonSerializer.Deserialize<List<PodItem>>(
+                JsonText,
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+            if (items == null || items.Count == 0)
+            {
+                Message = "No PODItems found in JSON.";
+                return;
+            }
+
+            var result = await RecordsApiClient.ImportAsync(items);
+
+            if (result == null)
+            {
+                Message = "Import completed, but no result was returned.";
+                return;
+            }
+
+            Message =
+                $"Received: {result.Received}, Inserted: {result.Inserted}, Already Present: {result.AlreadyPresent}";
+        }
+        catch (JsonException ex)
+        {
+            Message = $"Invalid JSON: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            Message = $"Import failed: {ex.Message}";
+        }
+        finally
+        {
+            IsImporting = false;
+        }
+    }
+}

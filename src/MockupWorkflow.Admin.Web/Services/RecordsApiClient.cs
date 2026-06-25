@@ -1,4 +1,6 @@
 ﻿
+using MockupWorkflow.Shared.Models;
+using MockupWorkflow.Admin.Web.Models;
 
 namespace MockupWorkflow.Admin.Web.Services
 {
@@ -13,6 +15,18 @@ namespace MockupWorkflow.Admin.Web.Services
         public async Task<string> GetHealthAsync()
         {
             return await _httpClient.GetStringAsync("/");
+        }
+        public async Task<ImportResult?> ImportAsync(
+    IEnumerable<PodItem> items)
+        {
+            var response = await _httpClient.PostAsJsonAsync(
+                "/records/import",
+                items);
+
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content
+                .ReadFromJsonAsync<ImportResult>();
         }
     }
 }

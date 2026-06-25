@@ -2,10 +2,16 @@ using MockupWorkflow.Admin.Web.Components;
 using MockupWorkflow.Admin.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Services.AddAntiforgery(options =>
+{
+    options.Cookie.Name = "MockupWorkflow.Admin.Antiforgery";
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.None;
+});
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
 
 builder.Services.AddHttpClient<RecordsApiClient>((sp, client) =>
 {
@@ -20,6 +26,7 @@ builder.Services.AddHttpClient<RecordsApiClient>((sp, client) =>
 
 var app = builder.Build();
 
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -27,12 +34,16 @@ if (!app.Environment.IsDevelopment())
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
+app.UseStatusCodePagesWithReExecute("/not-found");
 
+
+
+
+//app.UseHttpsRedirection();
+
+app.UseStaticFiles();
 app.UseAntiforgery();
 
-app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
