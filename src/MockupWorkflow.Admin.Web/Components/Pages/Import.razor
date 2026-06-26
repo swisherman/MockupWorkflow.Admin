@@ -5,7 +5,7 @@
 @using MockupWorkflow.Admin.Web.Models
 @using MockupWorkflow.Admin.Web.Services
 @inject RecordsApiClient RecordsApiClient
-
+@inject FolderCreatorApiClient FolderCreatorApi
 
 <h3>Import POD Items</h3>
 
@@ -106,9 +106,9 @@
                 Message = "Import completed, but no result was returned.";
                 return;
             }
-
+            await FolderCreatorApi.CreateFoldersAsync(items);
             Message =
-                $"Received: {result.Received}, Inserted: {result.Inserted}, Already Present: {result.AlreadyPresent}";
+    $"Received: {result.Received}, Inserted: {result.Inserted}, Already Present: {result.AlreadyPresent}, Folders Created: {items.Count * 2}";
         }
         catch (JsonException ex)
         {

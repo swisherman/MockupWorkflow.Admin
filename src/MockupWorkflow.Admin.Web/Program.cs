@@ -27,6 +27,13 @@ builder.Services.AddHttpClient<RecordsApiClient>((sp, client) =>
         configuration["WorkflowApi:BaseUrl"]!);
 });
 
+builder.Services.AddHttpClient<FolderCreatorApiClient>((sp, client) =>
+{
+    var configuration = sp.GetRequiredService<IConfiguration>();
+
+    client.BaseAddress = new Uri(
+        configuration["FolderCreatorApi:BaseUrl"]!);
+});
 
 
 
