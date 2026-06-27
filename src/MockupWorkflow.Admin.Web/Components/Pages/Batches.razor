@@ -1,0 +1,32 @@
+﻿@page "/batches"
+@using MockupWorkflow.Shared.Models
+@using MockupWorkflow.Admin.Web.Services
+@inject RecordsApiClient RecordsApiClient
+
+<h3>Batches</h3>
+
+<MudTable Items="batches" Hover="true" Dense="true">
+    <HeaderContent>
+        <MudTh>Batch ID</MudTh>
+        <MudTh>Product Type</MudTh>
+        <MudTh>Items</MudTh>
+        <MudTh>Mockups</MudTh>
+        <MudTh>Last Modified</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>@context.BatchId</MudTd>
+        <MudTd>@context.ProductType</MudTd>
+        <MudTd>@context.ItemCount</MudTd>
+        <MudTd>@context.MockupProcessedCount / @context.ItemCount</MudTd>
+        <MudTd>@context.LastModified</MudTd>
+    </RowTemplate>
+</MudTable>
+
+@code {
+    private List<BatchSummary> batches = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        batches = await RecordsApiClient.GetBatchesAsync();
+    }
+}

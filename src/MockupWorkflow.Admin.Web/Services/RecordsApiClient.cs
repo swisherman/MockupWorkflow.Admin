@@ -1,6 +1,7 @@
 ﻿
-using MockupWorkflow.Shared.Models;
 using MockupWorkflow.Admin.Web.Models;
+using MockupWorkflow.Shared.Models;
+using static System.Net.WebRequestMethods;
 
 namespace MockupWorkflow.Admin.Web.Services
 {
@@ -27,6 +28,12 @@ namespace MockupWorkflow.Admin.Web.Services
 
             return await response.Content
                 .ReadFromJsonAsync<ImportResult>();
+        }
+        public async Task<List<BatchSummary>> GetBatchesAsync()
+        {
+            
+            return await _httpClient.GetFromJsonAsync<List<BatchSummary>>("/records/batches")
+                   ?? new List<BatchSummary>();
         }
     }
 }

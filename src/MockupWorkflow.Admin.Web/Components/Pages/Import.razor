@@ -17,7 +17,7 @@
               Lines="20"
               Variant="Variant.Outlined"
               FullWidth="true"
-              AutoGrow="false" />
+               />
 
 <MudSelect T="string"
            Label="Product Type"
@@ -40,13 +40,27 @@
     @(IsImporting ? "Importing..." : "Import")
 </MudButton>
 
+
+@if (!string.IsNullOrWhiteSpace(batchId))
+{
+    <br />
+    <MudTextField T="string"
+                  Label="Batch ID"
+                  Value="@batchId"
+                  ReadOnly="true"
+                  Variant="Variant.Outlined"
+                  FullWidth="true" />
+}
+
 @if (!string.IsNullOrWhiteSpace(Message))
 {
-    <p>@Message</p>
+    <MudAlert Severity="Severity.Success" Variant="Variant.Outlined">
+        <pre>@Message</pre>
+    </MudAlert>
 }
 
 @code {
-    private string batchId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+    private string batchId = string.Empty;
     private string productType = "tshirt";
     private string JsonText = """
     [
@@ -108,7 +122,18 @@
             }
             await FolderCreatorApi.CreateFoldersAsync(items);
             Message =
-    $"Received: {result.Received}, Inserted: {result.Inserted}, Already Present: {result.AlreadyPresent}, Folders Created: {items.Count * 2}";
+         $"""
+    Import completed successfully.
+
+    Batch ID: {batchId}
+
+    Product Type: {productType}
+
+    Received: {result.Received}
+    Inserted: {result.Inserted}
+    Already Present: {result.AlreadyPresent}
+    Folders Created: {items.Count * 2}
+    """;
         }
         catch (JsonException ex)
         {
