@@ -5,7 +5,7 @@
 @inject RecordsApiClient RecordsApiClient
 @inject NavigationManager Navigation
 
-<MudText Typo="Typo.h4">Batch Details</MudText>
+<MudText Typo="Typo.h4">Production Batch</MudText>
 
 <MudButton Variant="Variant.Text"
            Color="Color.Secondary"
@@ -13,9 +13,37 @@
     ← Back to Batches
 </MudButton>
 
-<MudText Typo="Typo.subtitle1" Class="mt-3">
-    Batch ID: @BatchId
-</MudText>
+<MudPaper Class="pa-4 mb-4">
+
+    <MudGrid>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudText Typo="Typo.caption">Batch ID</MudText>
+            <MudText Typo="Typo.h6">@BatchId</MudText>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudText Typo="Typo.caption">Product Type</MudText>
+            <MudText Typo="Typo.h6">
+                @(items.FirstOrDefault()?.ProductType ?? "-")
+            </MudText>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudText Typo="Typo.caption">Items</MudText>
+            <MudText Typo="Typo.h6">@items.Count</MudText>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudText Typo="Typo.caption">Processed</MudText>
+            <MudText Typo="Typo.h6">
+                @items.Count(x => x.MockupProcessed) / @items.Count
+            </MudText>
+        </MudItem>
+
+    </MudGrid>
+
+</MudPaper>
 
 <MudDivider Class="my-4" />
 
