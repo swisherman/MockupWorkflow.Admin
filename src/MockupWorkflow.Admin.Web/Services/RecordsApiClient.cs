@@ -35,5 +35,14 @@ namespace MockupWorkflow.Admin.Web.Services
             return await _httpClient.GetFromJsonAsync<List<BatchSummary>>("/records/batches")
                    ?? new List<BatchSummary>();
         }
+        public async Task<List<PodItem>> GetBatchItemsAsync(string batchId, string? productType = null)
+        {
+            var url = string.IsNullOrWhiteSpace(productType)
+                ? $"/records/batches/{batchId}"
+                : $"/records/batches/{batchId}?productType={Uri.EscapeDataString(productType)}";
+
+            return await _httpClient.GetFromJsonAsync<List<PodItem>>(url)
+                   ?? new List<PodItem>();
+        }
     }
 }

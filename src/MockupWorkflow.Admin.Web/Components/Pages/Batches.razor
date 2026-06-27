@@ -14,7 +14,11 @@
         <MudTh>Last Modified</MudTh>
     </HeaderContent>
     <RowTemplate>
-        <MudTd>@context.BatchId</MudTd>
+        <MudTd>
+            <MudLink Href="@($"/batches/{context.BatchId}")">
+                @context.BatchId
+            </MudLink>
+        </MudTd>
         <MudTd>@context.ProductType</MudTd>
         <MudTd>@context.ItemCount</MudTd>
         <MudTd>@context.MockupProcessedCount / @context.ItemCount</MudTd>
