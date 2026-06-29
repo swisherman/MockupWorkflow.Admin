@@ -13,6 +13,14 @@
     ← Back to Batches
 </MudButton>
 
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    // existing MudPaper summary card and table go here
 <MudPaper Class="pa-4 mb-4">
 
     <MudGrid>
@@ -44,6 +52,7 @@
     </MudGrid>
 
 </MudPaper>
+}
 
 <MudDivider Class="my-4" />
 
@@ -79,9 +88,12 @@ else
     public string BatchId { get; set; } = "";
 
     private List<PodItem> items = new();
+    private bool isLoading = true;
 
     protected override async Task OnInitializedAsync()
     {
         items = await RecordsApiClient.GetBatchItemsAsync(BatchId);
+         isLoading = false;
+
     }
 }
