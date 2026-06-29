@@ -44,5 +44,15 @@ namespace MockupWorkflow.Admin.Web.Services
             return await _httpClient.GetFromJsonAsync<List<PodItem>>(url)
                    ?? new List<PodItem>();
         }
+        public async Task ProcessBatchMockupsAsync(string batchId, string? productType = null)
+        {
+            var url = string.IsNullOrWhiteSpace(productType)
+                ? $"/records/batches/{batchId}/process-mockups"
+                : $"/records/batches/{batchId}/process-mockups?productType={Uri.EscapeDataString(productType)}";
+
+            var response = await _httpClient.PostAsync(url, null);
+
+            response.EnsureSuccessStatusCode();
+        }
     }
 }

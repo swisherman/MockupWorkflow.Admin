@@ -52,6 +52,18 @@ else
     </MudGrid>
 
 </MudPaper>
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               Disabled="@isProcessing"
+               OnClick="GenerateMockups">
+        @(isProcessing ? "Processing..." : "Generate Mockups")
+    </MudButton>
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-3">
+            @message
+        </MudAlert>
+    }
 }
 
 <MudDivider Class="my-4" />
@@ -72,12 +84,18 @@ else
             <MudTh>Mockup</MudTh>
             <MudTh>Folder</MudTh>
         </HeaderContent>
-
         <RowTemplate>
             <MudTd>@context.Phrase</MudTd>
             <MudTd>@context.ProductType</MudTd>
             <MudTd>@context.ProcessingStatus</MudTd>
-            <MudTd>@(context.MockupProcessed ? "Yes" : "No")</MudTd>
+            <MudTd>
+                <MudIcon Icon="@(context.MockupProcessed
+                                                    ? Icons.Material.Filled.CheckCircle
+                                                : Icons.Material.Filled.RadioButtonUnchecked)"
+                         Color="@(context.MockupProcessed
+                                                    ? Color.Success
+                                                    : Color.Default)" />
+            </MudTd>
             <MudTd>@context.FolderName</MudTd>
         </RowTemplate>
     </MudTable>
@@ -90,10 +108,37 @@ else
     private List<PodItem> items = new();
     private bool isLoading = true;
 
+    private bool isProcessing;
+    private string? message;
+
     protected override async Task OnInitializedAsync()
     {
         items = await RecordsApiClient.GetBatchItemsAsync(BatchId);
          isLoading = false;
 
+    }
+    private async Task GenerateMockups()
+    {
+        try
+        {
+            isProcessing = true;
+            message = null;
+
+            var productType = items.FirstOrDefault()?.ProductType;
+
+            await RecordsApiClient.ProcessBatchMockupsAsync(BatchId, productType);
+
+            items = await RecordsApiClient.GetBatchItemsAsync(BatchId);
+
+            message = "Mockup processing completed.";
+        }
+        catch (Exception ex)
+        {
+            message = $"Mockup processing failed: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
     }
 }
