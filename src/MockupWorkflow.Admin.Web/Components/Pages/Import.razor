@@ -1,4 +1,5 @@
 ﻿@page "/import"
+@using System.IO
 @using System.Text.Json
 @using MudBlazor
 @using MockupWorkflow.Shared.Models;
@@ -6,14 +7,22 @@
 @using MockupWorkflow.Admin.Web.Services
 @inject RecordsApiClient RecordsApiClient
 @inject FolderCreatorApiClient FolderCreatorApi
+@inject PngUploadService PngUploadService
+
+
+
+
 
 <h3>Import POD Items</h3>
+<InputFile OnChange="HandleBatchFolderSelected" multiple webkitdirectory />
+
 
 <p>Paste a JSON array of PODItems below.</p>
 
 <MudTextField T="string"
               Label="POD Items JSON"
               @bind-Value="JsonText"
+              Immediate="true"
               Lines="20"
               Variant="Variant.Outlined"
               FullWidth="true"
@@ -33,9 +42,10 @@
 <br />
 <br />
 
-<MudButton Variant="Variant.Filled"
+<MudButton ButtonType="ButtonType.Button" 
+    Variant="Variant.Filled"
            Color="Color.Primary"
-           OnClick="ImportItems"
+           OnClick="@(() => ImportItems())"
            Disabled="@IsImporting">
     @(IsImporting ? "Importing..." : "Import")
 </MudButton>
@@ -62,20 +72,15 @@
 @code {
     private string batchId = string.Empty;
     private string productType = "tshirt";
-    private string JsonText = """
-    [
-      {
-        "sourceKey": "coffee-until-further-notice",
-        "phrase": "Coffee Until Further Notice",
-        "fileName": "coffee-until-further-notice",
-        "category": "shirts",
-        "status": "Ready"
-      }
-    ]
-    """;
+    private string JsonText = "[]";
 
     private string Message = string.Empty;
     private bool IsImporting;
+    private string inputFoldersRoot = "/data/builds/input_folders";
+    private IReadOnlyList<IBrowserFile> inputFolderFiles = [];
+    private IReadOnlyList<IBrowserFile> batchFiles = [];
+    private IBrowserFile? batchJsonFile;
+    private List<IBrowserFile> inputPngFiles = [];
 
     private async Task ImportItems()
     {
@@ -91,18 +96,68 @@
                 {
                     PropertyNameCaseInsensitive = true
                 });
+            Message = $"Deserialized count: {items?.Count ?? -1}";
+            Console.WriteLine($"JsonText length: {JsonText.Length}");
+            Console.WriteLine(JsonText.Substring(0, Math.Min(JsonText.Length, 200)));
+            Console.WriteLine($"items == null: {items == null}");
+            Console.WriteLine($"Count: {items?.Count ?? -1}");
+            Console.WriteLine($"JsonText length: {JsonText?.Length ?? 0}");
+            Console.WriteLine($"Deserialized item count: {items?.Count ?? -1}");
+         
             if (items != null)
             {
                 foreach (var item in items)
                 {
+                    // Normalize the Windows path stored in batch.json.
+                    // Admin runs in Linux, so System.IO.Path does not interpret
+                    // Windows backslashes as directory separators.
+                    if (!string.IsNullOrWhiteSpace(item.Filename))
+                    {
+                        var originalPath = item.Filename;
+                        var normalizedPath = originalPath.Replace('\\', '/');
+
+                        item.Filename = normalizedPath.Split('/').Last();
+
+                        if (string.IsNullOrWhiteSpace(item.FolderName))
+                        {
+                            var parts = normalizedPath.Split(
+                                '/',
+                                StringSplitOptions.RemoveEmptyEntries);
+
+                            var inputFoldersIndex = Array.FindIndex(
+                                parts,
+                                p => string.Equals(
+                                    p,
+                                    "input_folders",
+                                    StringComparison.OrdinalIgnoreCase));
+
+                            if (inputFoldersIndex >= 0 &&
+                                inputFoldersIndex + 1 < parts.Length)
+                            {
+                                item.FolderName = parts[inputFoldersIndex + 1];
+                            }
+                        }
+
+                        if (string.IsNullOrWhiteSpace(item.Phrase) &&
+                            !string.IsNullOrWhiteSpace(item.FolderName))
+                        {
+                            item.Phrase = item.FolderName.Replace(".", " ");
+                        }
+                    }
+
                     item.BatchId = batchId;
                     item.ProductType = productType;
-                    if (string.IsNullOrWhiteSpace(item.FolderName))
+
+                    if (string.IsNullOrWhiteSpace(item.FolderName) &&
+                        !string.IsNullOrWhiteSpace(item.Phrase))
+                    {
                         item.FolderName = item.Phrase.Replace(" ", ".");
+                    }
+
                     item.MockupRoot = "/data/builds";
                     item.ExpectedFolderName = item.FolderName;
-
-                    item.SourceKey = $"{item.BatchId}:{item.ProductType}:{item.FolderName}";
+                    item.SourceKey =
+                        $"{item.BatchId}:{item.ProductType}:{item.FolderName}";
                 }
             }
 
@@ -121,6 +176,28 @@
                 return;
             }
             await FolderCreatorApi.CreateFoldersAsync(items);
+
+
+
+            foreach (var item in items.Take(10))
+            {
+                Console.WriteLine(
+                    $"Item: Phrase='{item.Phrase}', FolderName='{item.FolderName}', Filename='{item.Filename}'"
+                );
+            }
+
+
+
+
+
+            await PngUploadService.UploadInputFilesAsync(
+           inputPngFiles,
+           items,
+           batchId,
+           productType
+           );
+
+
             Message =
          $"""
     Import completed successfully.
@@ -146,6 +223,40 @@
         finally
         {
             IsImporting = false;
+        }
+    }
+    
+    private void HandleInputFolderFiles(InputFileChangeEventArgs e)
+    {
+        inputFolderFiles = e.GetMultipleFiles(int.MaxValue);
+        Message = $"Selected {inputFolderFiles.Count} input files.";
+    }
+    private async Task HandleBatchFolderSelected(InputFileChangeEventArgs e)
+    {
+        batchFiles = e.GetMultipleFiles(int.MaxValue);
+
+        foreach (var file in batchFiles.Take(10))
+        {
+            Console.WriteLine($"Selected file: {file.Name}");
+        }
+
+        batchJsonFile = batchFiles
+            .FirstOrDefault(f => f.Name.Equals("batch.json", StringComparison.OrdinalIgnoreCase));
+
+        inputPngFiles = batchFiles
+            .Where(f =>
+                f.Name.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        Message =
+            $"Selected batch folder. JSON: {(batchJsonFile != null ? "found" : "missing")}, PNG files: {inputPngFiles.Count}";
+
+        if (batchJsonFile != null)
+        {
+            using var stream = batchJsonFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+
+            JsonText = await reader.ReadToEndAsync();
         }
     }
 }

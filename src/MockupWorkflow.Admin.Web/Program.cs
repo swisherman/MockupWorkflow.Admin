@@ -1,8 +1,14 @@
+using Microsoft.AspNetCore.SignalR;
 using MockupWorkflow.Admin.Web.Components;
 using MockupWorkflow.Admin.Web.Services;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.Configure<HubOptions>(options =>
+{
+    options.MaximumReceiveMessageSize = 1024 * 1024;
+});
+
 builder.Services.AddAntiforgery(options =>
 {
     options.Cookie.Name = "MockupWorkflow.Admin.Antiforgery";
@@ -12,6 +18,7 @@ builder.Services.AddAntiforgery(options =>
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
 
 // Add MudBlazor services
 builder.Services.AddMudServices();
@@ -25,6 +32,11 @@ builder.Services.AddHttpClient<RecordsApiClient>((sp, client) =>
 
     client.BaseAddress = new Uri(
         configuration["WorkflowApi:BaseUrl"]!);
+});
+builder.Services.AddHttpClient<PngUploadService>((sp, client) =>
+{
+    var configuration = sp.GetRequiredService<IConfiguration>();
+    client.BaseAddress = new Uri(configuration["PngApi:BaseUrl"]!);
 });
 
 builder.Services.AddHttpClient<FolderCreatorApiClient>((sp, client) =>

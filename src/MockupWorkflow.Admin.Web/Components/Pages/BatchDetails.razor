@@ -20,7 +20,7 @@
 }
 else
 {
-    // existing MudPaper summary card and table go here
+    @* Summary card *@
 <MudPaper Class="pa-4 mb-4">
 
     <MudGrid>
@@ -56,7 +56,7 @@ else
                Color="Color.Primary"
                Disabled="@isProcessing"
                OnClick="GenerateMockups">
-        @(isProcessing ? "Processing..." : "Generate Mockups")
+        @(isProcessing ? "Processing..." : "Request Mockup Processing")
     </MudButton>
     @if (!string.IsNullOrWhiteSpace(message))
     {
@@ -64,18 +64,6 @@ else
             @message
         </MudAlert>
     }
-}
-
-<MudDivider Class="my-4" />
-
-@if (items.Count == 0)
-{
-    <MudAlert Severity="Severity.Info">
-        No items found for this batch.
-    </MudAlert>
-}
-else
-{
     <MudTable Items="items" Hover="true" Dense="true">
         <HeaderContent>
             <MudTh>Phrase</MudTh>
@@ -90,16 +78,22 @@ else
             <MudTd>@context.ProcessingStatus</MudTd>
             <MudTd>
                 <MudIcon Icon="@(context.MockupProcessed
-                                                    ? Icons.Material.Filled.CheckCircle
-                                                : Icons.Material.Filled.RadioButtonUnchecked)"
+                                                                             ? Icons.Material.Filled.CheckCircle
+                                                                     : Icons.Material.Filled.RadioButtonUnchecked)"
                          Color="@(context.MockupProcessed
-                                                    ? Color.Success
-                                                    : Color.Default)" />
+                                                                             ? Color.Success
+                                                                             : Color.Default)" />
             </MudTd>
             <MudTd>@context.FolderName</MudTd>
         </RowTemplate>
     </MudTable>
 }
+
+<MudDivider Class="my-4" />
+
+
+ 
+
 
 @code {
     [Parameter]
@@ -130,7 +124,8 @@ else
 
             items = await RecordsApiClient.GetBatchItemsAsync(BatchId);
 
-            message = "Mockup processing completed.";
+            message = "Mockup processing requested.";
+            
         }
         catch (Exception ex)
         {
