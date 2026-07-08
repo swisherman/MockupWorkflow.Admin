@@ -8,14 +8,20 @@
 @inject RecordsApiClient RecordsApiClient
 @inject FolderCreatorApiClient FolderCreatorApi
 @inject PngUploadService PngUploadService
-
+@rendermode InteractiveServer
 
 
 
 
 <h3>Import POD Items</h3>
-<InputFile OnChange="HandleBatchFolderSelected" multiple webkitdirectory />
 
+<p>Incoming value: @incomingBatchFolder</p>
+
+
+
+<input @bind="incomingBatchFolder"
+       @oninput="OnIncomingBatchFolderChanged"
+       placeholder="134247973614855797" />
 
 <p>Paste a JSON array of PODItems below.</p>
 
@@ -45,7 +51,7 @@
 <MudButton ButtonType="ButtonType.Button" 
     Variant="Variant.Filled"
            Color="Color.Primary"
-           OnClick="@(() => ImportItems())"
+           OnClick="@(async () => await ImportItems())"
            Disabled="@IsImporting">
     @(IsImporting ? "Importing..." : "Import")
 </MudButton>
@@ -76,16 +82,13 @@
 
     private string Message = string.Empty;
     private bool IsImporting;
-    private string inputFoldersRoot = "/data/builds/input_folders";
-    private IReadOnlyList<IBrowserFile> inputFolderFiles = [];
-    private IReadOnlyList<IBrowserFile> batchFiles = [];
-    private IBrowserFile? batchJsonFile;
-    private List<IBrowserFile> inputPngFiles = [];
+    private string incomingBatchFolder = "";
 
     private async Task ImportItems()
     {
         try
         {
+          
             IsImporting = true;
             Message = string.Empty;
             batchId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
@@ -185,18 +188,29 @@
                     $"Item: Phrase='{item.Phrase}', FolderName='{item.FolderName}', Filename='{item.Filename}'"
                 );
             }
+            incomingBatchFolder = incomingBatchFolder?.Trim() ?? "";
 
+            Console.WriteLine($"incomingBatchFolder = '{incomingBatchFolder}'");
 
+            if (string.IsNullOrWhiteSpace(incomingBatchFolder))
+            {
+                Message = "Incoming Batch Folder is required.";
+                return;
+            }
 
+            var inputFoldersRoot =
+                $"/incoming/{incomingBatchFolder}/input_folders";
 
+            Console.WriteLine($"Scanning input folders root: {inputFoldersRoot}");
 
-            await PngUploadService.UploadInputFilesAsync(
-           inputPngFiles,
-           items,
-           batchId,
-           productType
-           );
+            // Upload all PNGs found recursively
+            await PngUploadService.UploadInputFoldersAsync(
+                inputFoldersRoot,
+                batchId,
+                productType
+            );
 
+           
 
             Message =
          $"""
@@ -226,37 +240,16 @@
         }
     }
     
-    private void HandleInputFolderFiles(InputFileChangeEventArgs e)
+
+ 
+    private Dictionary<string, object> BatchFolderInputAttributes = new()
+{
+    { "webkitdirectory", "webkitdirectory" },
+    { "directory", "directory" }
+};
+    private void OnIncomingBatchFolderChanged(ChangeEventArgs e)
     {
-        inputFolderFiles = e.GetMultipleFiles(int.MaxValue);
-        Message = $"Selected {inputFolderFiles.Count} input files.";
-    }
-    private async Task HandleBatchFolderSelected(InputFileChangeEventArgs e)
-    {
-        batchFiles = e.GetMultipleFiles(int.MaxValue);
-
-        foreach (var file in batchFiles.Take(10))
-        {
-            Console.WriteLine($"Selected file: {file.Name}");
-        }
-
-        batchJsonFile = batchFiles
-            .FirstOrDefault(f => f.Name.Equals("batch.json", StringComparison.OrdinalIgnoreCase));
-
-        inputPngFiles = batchFiles
-            .Where(f =>
-                f.Name.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        Message =
-            $"Selected batch folder. JSON: {(batchJsonFile != null ? "found" : "missing")}, PNG files: {inputPngFiles.Count}";
-
-        if (batchJsonFile != null)
-        {
-            using var stream = batchJsonFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
-            using var reader = new StreamReader(stream);
-
-            JsonText = await reader.ReadToEndAsync();
-        }
+        incomingBatchFolder = e.Value?.ToString() ?? "";
+        Console.WriteLine($"Changed incomingBatchFolder to '{incomingBatchFolder}'");
     }
 }

@@ -6,7 +6,7 @@ using MudBlazor.Services;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<HubOptions>(options =>
 {
-    options.MaximumReceiveMessageSize = 1024 * 1024;
+    options.MaximumReceiveMessageSize = 100 * 1024 * 1024;
 });
 
 builder.Services.AddAntiforgery(options =>

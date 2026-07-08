@@ -13,36 +13,7 @@ public class PngUploadService
         _http = http;
     }
 
-    public async Task UploadInputFilesAsync(
-    IEnumerable<IBrowserFile> files,
-    IEnumerable<PodItem> items,
-    string batchId,
-    string productType)
-    {
-        var fileByName = files
-         .GroupBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
-         .ToDictionary(
-             g => g.Key,
-             g => g.First(),
-             StringComparer.OrdinalIgnoreCase
-         );
-
-        foreach (var item in items)
-        {
-            if (string.IsNullOrWhiteSpace(item.FolderName) ||
-                string.IsNullOrWhiteSpace(item.Filename))
-                continue;
-
-            if (!fileByName.TryGetValue(item.Filename, out var file))
-                throw new FileNotFoundException($"Selected upload files did not include {item.Filename}");
-
-            var remotePath =
-                $"{batchId}/{productType}/input_folders/{Uri.EscapeDataString(item.FolderName)}/{Uri.EscapeDataString(item.Filename)}";
-
-            await UploadBrowserFileAsync(file, remotePath);
-        }
-    }
-
+  
     private async Task UploadFileAsync(string localFilePath, string remotePath)
     {
         byte[] fileBytes = await File.ReadAllBytesAsync(localFilePath);
@@ -62,21 +33,28 @@ public class PngUploadService
                 $"PNG upload failed: {(int)response.StatusCode} {response.ReasonPhrase}\n{responseText}");
         }
     }
-    private async Task UploadBrowserFileAsync(IBrowserFile file, string remotePath)
+    public async Task UploadInputFoldersAsync(
+    string inputFoldersRoot,
+    string batchId,
+    string productType)
     {
-        await using var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+        if (!Directory.Exists(inputFoldersRoot))
+            throw new DirectoryNotFoundException(inputFoldersRoot);
 
-        using var content = new StreamContent(stream);
-        content.Headers.ContentType =
-            new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        var files = Directory.GetFiles(
+            inputFoldersRoot,
+            "*.png",
+            SearchOption.AllDirectories);
 
-        var response = await _http.PostAsync($"/api/files/{remotePath}", content);
-
-        if (!response.IsSuccessStatusCode)
+        foreach (var file in files)
         {
-            var responseText = await response.Content.ReadAsStringAsync();
-            throw new InvalidOperationException(
-                $"PNG upload failed for {file.Name}: {(int)response.StatusCode} {response.ReasonPhrase}\n{responseText}");
+            var folderName = Path.GetFileName(Path.GetDirectoryName(file));
+            var fileName = Path.GetFileName(file);
+
+            var remotePath =
+                $"{batchId}/{productType}/input_folders/{Uri.EscapeDataString(folderName)}/{Uri.EscapeDataString(fileName)}";
+
+            await UploadFileAsync(file, remotePath);
         }
     }
 }
