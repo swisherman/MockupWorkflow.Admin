@@ -29,6 +29,19 @@ namespace MockupWorkflow.Admin.Web.Services
             return await response.Content
                 .ReadFromJsonAsync<ImportResult>();
         }
+        public async Task<RetryFailedBatchResult?> RetryFailedBatchAsync(
+    string batchId)
+        {
+            var response = await _httpClient.PostAsync(
+                $"/records/batches/{Uri.EscapeDataString(batchId)}/retry-failed",
+                content: null
+            );
+
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content
+                .ReadFromJsonAsync<RetryFailedBatchResult>();
+        }
         public async Task<List<BatchSummary>> GetBatchesAsync()
         {
             

@@ -1,9 +1,11 @@
 ﻿@page "/batches/{BatchId}"
+
 @using MockupWorkflow.Shared.Models
 @using MockupWorkflow.Admin.Web.Services
 
 @inject RecordsApiClient RecordsApiClient
 @inject NavigationManager Navigation
+@implements IDisposable
 
 <MudText Typo="Typo.h4">Batch Overview</MudText>
 
@@ -13,76 +15,129 @@
     ← Back to Batches
 </MudButton>
 
-
 @if (isLoading)
 {
     <MudProgressCircular Indeterminate="true" />
 }
 else
 {
-    @* Summary card *@
-<MudPaper Class="pa-4 mb-4">
+    <MudPaper Class="pa-4 mb-4">
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="2">
+                <MudText Typo="Typo.caption">Batch ID</MudText>
+                <MudText Typo="Typo.h6">@BatchId</MudText>
+            </MudItem>
 
-    <MudGrid>
+            <MudItem xs="12" sm="6" md="2">
+                <MudText Typo="Typo.caption">Product Type</MudText>
+                <MudText Typo="Typo.h6">
+                    @(items.FirstOrDefault()?.ProductType ?? "-")
+                </MudText>
+            </MudItem>
 
-        <MudItem xs="12" sm="6" md="3">
-            <MudText Typo="Typo.caption">Batch ID</MudText>
-            <MudText Typo="Typo.h6">@BatchId</MudText>
-        </MudItem>
+            <MudItem xs="6" sm="3" md="1">
+                <MudText Typo="Typo.caption">Total</MudText>
+                <MudText Typo="Typo.h6">@items.Count</MudText>
+            </MudItem>
 
-        <MudItem xs="12" sm="6" md="3">
-            <MudText Typo="Typo.caption">Product Type</MudText>
-            <MudText Typo="Typo.h6">
-                @(items.FirstOrDefault()?.ProductType ?? "-")
-            </MudText>
-        </MudItem>
+            <MudItem xs="6" sm="3" md="1">
+                <MudText Typo="Typo.caption">Pending</MudText>
+                <MudText Typo="Typo.h6">@PendingCount</MudText>
+            </MudItem>
 
-        <MudItem xs="12" sm="6" md="3">
-            <MudText Typo="Typo.caption">Items</MudText>
-            <MudText Typo="Typo.h6">@items.Count</MudText>
-        </MudItem>
+            <MudItem xs="6" sm="3" md="1">
+                <MudText Typo="Typo.caption">Processing</MudText>
+                <MudText Typo="Typo.h6">@ProcessingCount</MudText>
+            </MudItem>
 
-        <MudItem xs="12" sm="6" md="3">
-            <MudText Typo="Typo.caption">Processed</MudText>
-            <MudText Typo="Typo.h6">
-                @items.Count(x => x.MockupProcessed) / @items.Count
-            </MudText>
-        </MudItem>
+            <MudItem xs="6" sm="3" md="1">
+                <MudText Typo="Typo.caption">Processed</MudText>
+                <MudText Typo="Typo.h6">@ProcessedCount</MudText>
+            </MudItem>
 
-    </MudGrid>
+            <MudItem xs="6" sm="3" md="1">
+                <MudText Typo="Typo.caption">Failed</MudText>
+                <MudText Typo="Typo.h6">@FailedCount</MudText>
+            </MudItem>
+        </MudGrid>
 
-</MudPaper>
+        <MudProgressLinear Class="mt-4"
+                           Value="@ProgressPercent"
+                           Color="@ProgressColor"
+                           Rounded="true" />
+
+        <MudText Typo="Typo.caption" Class="mt-1">
+            @ProcessedCount of @items.Count completed
+        </MudText>
+    </MudPaper>
     <MudButton Variant="Variant.Filled"
                Color="Color.Primary"
                Disabled="@isProcessing"
                OnClick="GenerateMockups">
         @(isProcessing ? "Processing..." : "Request Mockup Processing")
     </MudButton>
+
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Warning"
+               Disabled="@_retryingFailed"
+               OnClick="RetryFailedAsync">
+        @(_retryingFailed ? "Retrying..." : $"Retry Failed ({FailedCount})")
+    </MudButton>
+
     @if (!string.IsNullOrWhiteSpace(message))
     {
         <MudAlert Severity="Severity.Info" Class="mt-3">
             @message
         </MudAlert>
     }
+
     <MudTable Items="items" Hover="true" Dense="true">
         <HeaderContent>
             <MudTh>Phrase</MudTh>
             <MudTh>Product Type</MudTh>
             <MudTh>Status</MudTh>
             <MudTh>Mockup</MudTh>
+            <MudTh>Error</MudTh>
             <MudTh>Folder</MudTh>
         </HeaderContent>
+
         <RowTemplate>
             <MudTd>@context.Phrase</MudTd>
             <MudTd>@context.ProductType</MudTd>
-            <MudTd>@context.ProcessingStatus</MudTd>
             <MudTd>
-                <MudIcon Icon="@(context.MockupProcessed
-                                                                             ? Icons.Material.Filled.CheckCircle
-                                                                     : Icons.Material.Filled.RadioButtonUnchecked)"
-                         Color="@(context.MockupProcessed
-                                                                             ? Color.Success
-                                                                             : Color.Default)" />
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Color="@GetStatusColor(context.ProcessingStatus)">
+                    @GetStatusLabel(context.ProcessingStatus)
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudTooltip Text="@GetMockupStatusLabel(context)">
+                    <MudIcon Icon="@GetMockupStatusIcon(context)"
+                             Color="@GetMockupStatusColor(context)"
+                             Size="Size.Medium" />
+                </MudTooltip>
+            </MudTd>
+            <MudTd>
+                @if (string.Equals(
+                    context.ProcessingStatus,
+                    "failed",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    <MudText Typo="Typo.body2"
+                             Color="Color.Error">
+                        @(string.IsNullOrWhiteSpace(context.MockupError)
+                            ? "Unknown error"
+                            : context.MockupError)
+                    </MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2"
+                             Color="Color.Secondary">
+                        —
+                    </MudText>
+                }
             </MudTd>
             <MudTd>@context.FolderName</MudTd>
         </RowTemplate>
@@ -91,26 +146,40 @@ else
 
 <MudDivider Class="my-4" />
 
-
- 
-
-
 @code {
     [Parameter]
-    public string BatchId { get; set; } = "";
+    public string BatchId { get; set; } = string.Empty;
 
     private List<PodItem> items = new();
     private bool isLoading = true;
-
     private bool isProcessing;
+    private bool _retryingFailed;
     private string? message;
 
     protected override async Task OnInitializedAsync()
     {
-        items = await RecordsApiClient.GetBatchItemsAsync(BatchId);
-         isLoading = false;
+        await LoadBatchAsync();
 
+        if (HasActiveProcessing())
+        {
+            _ = StartAutoRefreshAsync();
+        }
     }
+
+    private async Task LoadBatchAsync()
+    {
+        isLoading = true;
+
+        try
+        {
+            items = await RecordsApiClient.GetBatchItemsAsync(BatchId);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
     private async Task GenerateMockups()
     {
         try
@@ -120,12 +189,13 @@ else
 
             var productType = items.FirstOrDefault()?.ProductType;
 
-            await RecordsApiClient.ProcessBatchMockupsAsync(BatchId, productType);
+            await RecordsApiClient.ProcessBatchMockupsAsync(
+                BatchId,
+                productType);
 
-            items = await RecordsApiClient.GetBatchItemsAsync(BatchId);
+            await LoadBatchAsync();
 
             message = "Mockup processing requested.";
-            
         }
         catch (Exception ex)
         {
@@ -136,4 +206,202 @@ else
             isProcessing = false;
         }
     }
+
+    private async Task RetryFailedAsync()
+    {
+        try
+        {
+            _retryingFailed = true;
+            message = null;
+
+            var result =
+                await RecordsApiClient.RetryFailedBatchAsync(BatchId);
+
+            message = result?.RetriedCount > 0
+                ? $"{result.RetriedCount} failed item(s) queued for retry."
+                : result?.Message ?? "No failed items found.";
+
+            await LoadBatchAsync();
+        }
+        catch (Exception ex)
+        {
+            message = $"Could not retry failed items: {ex.Message}";
+        }
+        finally
+        {
+            _retryingFailed = false;
+        }
+    }
+    private static Color GetStatusColor(string? status)
+    {
+        return status?.ToLowerInvariant() switch
+        {
+            "processed" => Color.Success,
+            "failed" => Color.Error,
+            "processing" => Color.Warning,
+            "ready" => Color.Info,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetStatusLabel(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return "Unknown";
+        }
+
+        return char.ToUpperInvariant(status[0]) + status[1..];
+    }
+    private static string GetMockupStatusIcon(PodItem item)
+    {
+        if (item.MockupProcessed)
+        {
+            return Icons.Material.Filled.CheckCircle;
+        }
+
+        return item.ProcessingStatus?.ToLowerInvariant() switch
+        {
+            "failed" => Icons.Material.Filled.Error,
+            "processing" => Icons.Material.Filled.HourglassTop,
+            "ready" => Icons.Material.Filled.PauseCircleFilled,
+            _ => Icons.Material.Filled.RadioButtonUnchecked
+        };
+    }
+    public void Dispose()
+    {
+        StopRefreshTimer();
+    }
+    private bool HasActiveProcessing()
+    {
+        return items?.Any(r =>
+            string.Equals(
+                r.ProcessingStatus,
+                "processing",
+                StringComparison.OrdinalIgnoreCase)) == true;
+    }
+    private static Color GetMockupStatusColor(PodItem item)
+    {
+        if (item.MockupProcessed)
+        {
+            return Color.Success;
+        }
+
+        return item.ProcessingStatus?.ToLowerInvariant() switch
+        {
+            "failed" => Color.Error,
+            "processing" => Color.Warning,
+            "ready" => Color.Info,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetMockupStatusLabel(PodItem item)
+    {
+        if (item.MockupProcessed)
+        {
+            return "Mockup completed";
+        }
+
+        return item.ProcessingStatus?.ToLowerInvariant() switch
+        {
+            "failed" => "Mockup failed",
+            "processing" => "Mockup processing",
+            "ready" => "Mockup pending",
+            _ => "Mockup not processed"
+        };
+    }
+    private void StopRefreshTimer()
+    {
+        _refreshCancellationTokenSource?.Cancel();
+        _refreshCancellationTokenSource?.Dispose();
+        _refreshCancellationTokenSource = null;
+
+        _refreshTimer?.Dispose();
+        _refreshTimer = null;
+    }
+    private async Task StartAutoRefreshAsync()
+    {
+        if (_refreshTimer is not null)
+        {
+            return;
+        }
+        _refreshCancellationTokenSource = new CancellationTokenSource();
+        _refreshTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+
+        try
+        {
+            while (await _refreshTimer.WaitForNextTickAsync(
+                       _refreshCancellationTokenSource.Token))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadBatchAsync();
+                    if (!HasActiveProcessing())
+                    {
+                        StopAutoRefresh();
+                    }
+
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when polling is stopped later.
+        }
+    }
+
+    private void StopAutoRefresh()
+    {
+        _refreshCancellationTokenSource?.Cancel();
+        _refreshCancellationTokenSource?.Dispose();
+        _refreshCancellationTokenSource = null;
+
+        _refreshTimer?.Dispose();
+        _refreshTimer = null;
+    }
+
+    private int ProcessedCount =>
+    items.Count(x => x.MockupProcessed);
+
+    private int FailedCount =>
+        items.Count(x =>
+            string.Equals(
+                x.ProcessingStatus,
+                "failed",
+                StringComparison.OrdinalIgnoreCase));
+
+    private int ProcessingCount =>
+        items.Count(x =>
+            string.Equals(
+                x.ProcessingStatus,
+                "processing",
+                StringComparison.OrdinalIgnoreCase));
+
+    private int PendingCount =>
+        items.Count(x =>
+            string.Equals(
+                x.ProcessingStatus,
+                "ready",
+                StringComparison.OrdinalIgnoreCase));
+
+    private double ProgressPercent =>
+        items.Count == 0
+            ? 0
+            : (double)ProcessedCount / items.Count * 100;
+
+    private Color ProgressColor =>
+        FailedCount > 0
+            ? Color.Error
+            : ProcessingCount > 0
+                ? Color.Warning
+                : ProcessedCount == items.Count && items.Count > 0
+                    ? Color.Success
+                    : Color.Primary;
+    private PeriodicTimer? _refreshTimer;
+    private CancellationTokenSource? _refreshCancellationTokenSource;
+
+    private static readonly TimeSpan RefreshInterval =
+        TimeSpan.FromSeconds(5);
 }
