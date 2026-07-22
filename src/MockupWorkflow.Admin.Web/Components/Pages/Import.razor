@@ -1,8 +1,11 @@
 ﻿@page "/import"
 @using System.IO
 @using System.Text.Json
+@using Microsoft.AspNetCore.Components.Forms
 @using MudBlazor
 @using MockupWorkflow.Shared.Models;
+@using MockupWorkflow.Shared.Manifests;
+
 @using MockupWorkflow.Admin.Web.Models
 @using MockupWorkflow.Admin.Web.Services
 @inject RecordsApiClient RecordsApiClient
@@ -18,7 +21,17 @@
 <p>Incoming value: @incomingBatchFolder</p>
 
 
-
+<InputFile OnChange="HandleManifestFileSelected"
+           accept=".json" />
+<MudButton ButtonType="ButtonType.Button"
+           Variant="Variant.Filled"
+           Color="Color.Secondary"
+           OnClick="ImportMosswickManifestAsync"
+           Disabled="@(IsImporting || manifestRecords.Count == 0)">
+    @(IsImporting
+        ? "Importing..."
+        : "Import Mosswick Manifest")
+</MudButton>
 <input @bind="incomingBatchFolder"
        @oninput="OnIncomingBatchFolderChanged"
        placeholder="134247973614855797" />
@@ -51,7 +64,7 @@
 <MudButton ButtonType="ButtonType.Button" 
     Variant="Variant.Filled"
            Color="Color.Primary"
-           OnClick="@(async () => await ImportItems())"
+           OnClick="@(async () => await ImportPodItemsAsync())"
            Disabled="@IsImporting">
     @(IsImporting ? "Importing..." : "Import")
 </MudButton>
@@ -83,8 +96,53 @@
     private string Message = string.Empty;
     private bool IsImporting;
     private string incomingBatchFolder = "";
+    private IBrowserFile? selectedManifestFile;
+    private string manifestFileName = string.Empty;
+    private List<MockupManifestRecord> manifestRecords = [];
+    private Dictionary<string, object> BatchFolderInputAttributes = new()
+{
+    { "webkitdirectory", "webkitdirectory" },
+    { "directory", "directory" }
+};
 
-    private async Task ImportItems()
+    private async Task HandleManifestFileSelected(
+     InputFileChangeEventArgs e)
+    {
+        selectedManifestFile = e.File;
+        manifestFileName = e.File.Name;
+
+        try
+        {
+            await using var stream =
+                selectedManifestFile.OpenReadStream(
+                    maxAllowedSize: 5 * 1024 * 1024);
+
+            manifestRecords =
+                await JsonSerializer.DeserializeAsync<
+                    List<MockupManifestRecord>>(
+                        stream,
+                        new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        })
+                ?? [];
+
+            Message =
+                $"Loaded {manifestRecords.Count} manifest record(s) " +
+                $"from {manifestFileName}.";
+        }
+        catch (JsonException ex)
+        {
+            manifestRecords = [];
+            Message = $"Invalid manifest JSON: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            manifestRecords = [];
+            Message = $"Could not read manifest: {ex.Message}";
+        }
+    }
+    private async Task ImportPodItemsAsync()
     {
         try
         {
@@ -99,69 +157,13 @@
                 {
                     PropertyNameCaseInsensitive = true
                 });
-            Message = $"Deserialized count: {items?.Count ?? -1}";
-            Console.WriteLine($"JsonText length: {JsonText.Length}");
-            Console.WriteLine(JsonText.Substring(0, Math.Min(JsonText.Length, 200)));
-            Console.WriteLine($"items == null: {items == null}");
-            Console.WriteLine($"Count: {items?.Count ?? -1}");
-            Console.WriteLine($"JsonText length: {JsonText?.Length ?? 0}");
-            Console.WriteLine($"Deserialized item count: {items?.Count ?? -1}");
-         
+           
             if (items != null)
             {
-                foreach (var item in items)
-                {
-                    // Normalize the Windows path stored in batch.json.
-                    // Admin runs in Linux, so System.IO.Path does not interpret
-                    // Windows backslashes as directory separators.
-                    if (!string.IsNullOrWhiteSpace(item.Filename))
-                    {
-                        var originalPath = item.Filename;
-                        var normalizedPath = originalPath.Replace('\\', '/');
-
-                        item.Filename = normalizedPath.Split('/').Last();
-
-                        if (string.IsNullOrWhiteSpace(item.FolderName))
-                        {
-                            var parts = normalizedPath.Split(
-                                '/',
-                                StringSplitOptions.RemoveEmptyEntries);
-
-                            var inputFoldersIndex = Array.FindIndex(
-                                parts,
-                                p => string.Equals(
-                                    p,
-                                    "input_folders",
-                                    StringComparison.OrdinalIgnoreCase));
-
-                            if (inputFoldersIndex >= 0 &&
-                                inputFoldersIndex + 1 < parts.Length)
-                            {
-                                item.FolderName = parts[inputFoldersIndex + 1];
-                            }
-                        }
-
-                        if (string.IsNullOrWhiteSpace(item.Phrase) &&
-                            !string.IsNullOrWhiteSpace(item.FolderName))
-                        {
-                            item.Phrase = item.FolderName.Replace(".", " ");
-                        }
-                    }
-
-                    item.BatchId = batchId;
-                    item.ProductType = productType;
-
-                    if (string.IsNullOrWhiteSpace(item.FolderName) &&
-                        !string.IsNullOrWhiteSpace(item.Phrase))
-                    {
-                        item.FolderName = item.Phrase.Replace(" ", ".");
-                    }
-
-                    item.MockupRoot = "/data/builds";
-                    item.ExpectedFolderName = item.FolderName;
-                    item.SourceKey =
-                        $"{item.BatchId}:{item.ProductType}:{item.FolderName}";
-                }
+                PreparePodItems(
+       items,
+       batchId,
+       productType);
             }
 
 
@@ -171,14 +173,13 @@
                 return;
             }
 
-            var result = await RecordsApiClient.ImportAsync(items);
+            var result = await CreateBatchAsync(items);
 
             if (result == null)
             {
                 Message = "Import completed, but no result was returned.";
                 return;
             }
-            await FolderCreatorApi.CreateFoldersAsync(items);
 
 
 
@@ -188,27 +189,7 @@
                     $"Item: Phrase='{item.Phrase}', FolderName='{item.FolderName}', Filename='{item.Filename}'"
                 );
             }
-            incomingBatchFolder = incomingBatchFolder?.Trim() ?? "";
-
-            Console.WriteLine($"incomingBatchFolder = '{incomingBatchFolder}'");
-
-            if (string.IsNullOrWhiteSpace(incomingBatchFolder))
-            {
-                Message = "Incoming Batch Folder is required.";
-                return;
-            }
-
-            var inputFoldersRoot =
-                $"/incoming/{incomingBatchFolder}/input_folders";
-
-            Console.WriteLine($"Scanning input folders root: {inputFoldersRoot}");
-
-            // Upload all PNGs found recursively
-            await PngUploadService.UploadInputFoldersAsync(
-                inputFoldersRoot,
-                batchId,
-                productType
-            );
+            await UploadImagesAsync(    batchId,    productType);
 
            
 
@@ -239,17 +220,191 @@
             IsImporting = false;
         }
     }
-    
+
+    private async Task ImportMosswickManifestAsync()
+    {
+        try
+        {
+            IsImporting = true;
+            Message = string.Empty;
+
+            if (manifestRecords.Count == 0)
+            {
+                Message = "Select a valid mockup manifest first.";
+                return;
+            }
+
+            batchId = DateTimeOffset.UtcNow
+                .ToUnixTimeMilliseconds()
+                .ToString();
+
+            var items = CreatePodItemsFromManifest(
+                manifestRecords,
+                batchId);
+
+            if (items.Count == 0)
+            {
+                Message = "The manifest did not produce any mockup items.";
+                return;
+            }
+
+            var result = await CreateBatchAsync(items);
+
+            if (result == null)
+            {
+                Message =
+                    "Import completed, but no result was returned.";
+                return;
+            }
+
+            Message =
+                $"""
+            Mosswick manifest imported successfully.
+
+            Manifest: {manifestFileName}
+            Batch ID: {batchId}
+
+            Received: {result.Received}
+            Inserted: {result.Inserted}
+            Already Present: {result.AlreadyPresent}
+            Folders Created: {items.Count * 2}
+            """;
+        }
+        catch (Exception ex)
+        {
+            Message =
+                $"Mosswick manifest import failed: {ex.Message}";
+        }
+        finally
+        {
+            IsImporting = false;
+        }
+    }
 
  
-    private Dictionary<string, object> BatchFolderInputAttributes = new()
-{
-    { "webkitdirectory", "webkitdirectory" },
-    { "directory", "directory" }
-};
+
     private void OnIncomingBatchFolderChanged(ChangeEventArgs e)
     {
         incomingBatchFolder = e.Value?.ToString() ?? "";
         Console.WriteLine($"Changed incomingBatchFolder to '{incomingBatchFolder}'");
+    }
+    private void PreparePodItems(
+    IEnumerable<PodItem> items,
+    string currentBatchId,
+    string currentProductType)
+    {
+        foreach (var item in items)
+        {
+            NormalizePodItemPath(item);
+
+            item.BatchId = currentBatchId;
+            item.ProductType = currentProductType;
+
+            if (string.IsNullOrWhiteSpace(item.FolderName) &&
+                !string.IsNullOrWhiteSpace(item.Phrase))
+            {
+                item.FolderName = item.Phrase.Replace(" ", ".");
+            }
+
+            item.MockupRoot = "/data/builds";
+            item.ExpectedFolderName = item.FolderName;
+            item.SourceKey =
+                $"{item.BatchId}:{item.ProductType}:{item.FolderName}";
+        }
+    }
+    private static void NormalizePodItemPath(PodItem item)
+    {
+        if (string.IsNullOrWhiteSpace(item.Filename))
+        {
+            return;
+        }
+
+        var normalizedPath =
+            item.Filename.Replace('\\', '/');
+
+        item.Filename =
+            normalizedPath.Split('/').Last();
+
+        if (string.IsNullOrWhiteSpace(item.FolderName))
+        {
+            var parts = normalizedPath.Split(
+                '/',
+                StringSplitOptions.RemoveEmptyEntries);
+
+            var inputFoldersIndex = Array.FindIndex(
+                parts,
+                part => string.Equals(
+                    part,
+                    "input_folders",
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (inputFoldersIndex >= 0 &&
+                inputFoldersIndex + 1 < parts.Length)
+            {
+                item.FolderName =
+                    parts[inputFoldersIndex + 1];
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(item.Phrase) &&
+            !string.IsNullOrWhiteSpace(item.FolderName))
+        {
+            item.Phrase =
+                item.FolderName.Replace(".", " ");
+        }
+    }
+    private async Task<ImportResult?> CreateBatchAsync(
+    IReadOnlyList<PodItem> items)
+    {
+        var result =
+            await RecordsApiClient.ImportAsync(items);
+
+        if (result == null)
+        {
+            return null;
+        }
+
+        await FolderCreatorApi.CreateFoldersAsync(
+           items.ToList());
+
+        return result;
+    }
+    private async Task UploadImagesAsync(
+    string batchId,
+    string productType)
+    {
+        incomingBatchFolder = incomingBatchFolder?.Trim() ?? "";
+
+        Console.WriteLine($"incomingBatchFolder = '{incomingBatchFolder}'");
+
+        if (string.IsNullOrWhiteSpace(incomingBatchFolder))
+        {
+            throw new InvalidOperationException(
+                "Incoming Batch Folder is required.");
+        }
+
+        var inputFoldersRoot =
+            $"/incoming/{incomingBatchFolder}/input_folders";
+
+        Console.WriteLine($"Scanning input folders root: {inputFoldersRoot}");
+
+        await PngUploadService.UploadInputFoldersAsync(
+            inputFoldersRoot,
+            batchId,
+            productType);
+    }
+    
+    
+    
+    private static List<PodItem> CreatePodItemsFromManifest(
+        IEnumerable<MockupManifestRecord> records,
+        string currentBatchId)
+    {
+        var mapper = new MockupManifestItemMapper();
+
+        return records
+            .Select(record =>
+                mapper.Map(record, currentBatchId))
+            .ToList();
     }
 }
