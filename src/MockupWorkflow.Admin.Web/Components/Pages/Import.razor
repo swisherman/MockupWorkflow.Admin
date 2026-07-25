@@ -23,15 +23,36 @@
 
 <InputFile OnChange="HandleManifestFileSelected"
            accept=".json" />
+
+
+<div class="mb-3">
+    <label class="form-label">
+        Mosswick source images
+    </label>
+
+    <InputFile OnChange="OnMosswickSourceImagesSelected"
+               multiple
+               accept=".png,.jpg,.jpeg,.webp" />
+
+    @if (mosswickSourceImages.Count > 0)
+    {
+        <p class="mt-2">
+            @mosswickSourceImages.Count image file(s) selected
+        </p>
+    }
+</div>
 <MudButton ButtonType="ButtonType.Button"
            Variant="Variant.Filled"
            Color="Color.Secondary"
            OnClick="ImportMosswickManifestAsync"
-           Disabled="@(IsImporting || manifestRecords.Count == 0)">
+           Disabled="@(IsImporting ||
+ manifestRecords.Count == 0 
+|| mosswickSourceImages.Count == 0 )">
     @(IsImporting
         ? "Importing..."
         : "Import Mosswick Manifest")
 </MudButton>
+
 <input @bind="incomingBatchFolder"
        @oninput="OnIncomingBatchFolderChanged"
        placeholder="134247973614855797" />
@@ -89,6 +110,8 @@
 }
 
 @code {
+    private MosswickBatch? selectedMosswickBatch;
+
     private string batchId = string.Empty;
     private string productType = "tshirt";
     private string JsonText = "[]";
@@ -104,9 +127,23 @@
     { "webkitdirectory", "webkitdirectory" },
     { "directory", "directory" }
 };
+    private IReadOnlyList<IBrowserFile> mosswickSourceImages =
+        Array.Empty<IBrowserFile>();
+
+    private void OnMosswickSourceImagesSelected(
+    InputFileChangeEventArgs args)
+    {
+        mosswickSourceImages = args
+            .GetMultipleFiles(100)
+            .ToList();
+    }
+
+
+
+
 
     private async Task HandleManifestFileSelected(
-     InputFileChangeEventArgs e)
+    InputFileChangeEventArgs e)
     {
         selectedManifestFile = e.File;
         manifestFileName = e.File.Name;
@@ -127,6 +164,14 @@
                         })
                 ?? [];
 
+            selectedMosswickBatch =
+                new MosswickBatch
+                {
+                    BatchFolder = string.Empty,
+                    ManifestPath = manifestFileName,
+                    Records = manifestRecords
+                };
+
             Message =
                 $"Loaded {manifestRecords.Count} manifest record(s) " +
                 $"from {manifestFileName}.";
@@ -134,14 +179,22 @@
         catch (JsonException ex)
         {
             manifestRecords = [];
-            Message = $"Invalid manifest JSON: {ex.Message}";
+            selectedMosswickBatch = null;
+
+            Message =
+                $"Invalid manifest JSON: {ex.Message}";
         }
         catch (Exception ex)
         {
             manifestRecords = [];
-            Message = $"Could not read manifest: {ex.Message}";
+            selectedMosswickBatch = null;
+
+            Message =
+                $"Could not read manifest: {ex.Message}";
         }
     }
+
+
     private async Task ImportPodItemsAsync()
     {
         try
@@ -221,6 +274,7 @@
         }
     }
 
+    
     private async Task ImportMosswickManifestAsync()
     {
         try
@@ -228,9 +282,18 @@
             IsImporting = true;
             Message = string.Empty;
 
-            if (manifestRecords.Count == 0)
+            if (selectedMosswickBatch == null ||
+                selectedMosswickBatch.Records.Count == 0)
             {
-                Message = "Select a valid mockup manifest first.";
+                Message =
+                    "Select a valid mockup manifest first.";
+                return;
+            }
+
+            if (mosswickSourceImages.Count == 0)
+            {
+                Message =
+                    "Select the Mosswick source image files.";
                 return;
             }
 
@@ -239,14 +302,36 @@
                 .ToString();
 
             var items = CreatePodItemsFromManifest(
-                manifestRecords,
+                selectedMosswickBatch.Records,
                 batchId);
 
             if (items.Count == 0)
             {
-                Message = "The manifest did not produce any mockup items.";
+                Message =
+                    "The manifest did not produce any mockup items.";
                 return;
             }
+
+            var productTypes = items
+                .Select(item => item.ProductType)
+                .Where(value =>
+                    !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (productTypes.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    "A Mosswick batch must currently contain " +
+                    "exactly one product type.");
+            }
+
+            var mosswickProductType = productTypes[0];
+
+            incomingBatchFolder =
+                await PrepareIncomingBatchFromManifestAsync(
+                    selectedMosswickBatch.Records,
+                    batchId);
 
             var result = await CreateBatchAsync(items);
 
@@ -257,17 +342,24 @@
                 return;
             }
 
+            await UploadImagesAsync(
+                batchId,
+                mosswickProductType);
+
             Message =
                 $"""
             Mosswick manifest imported successfully.
 
             Manifest: {manifestFileName}
             Batch ID: {batchId}
+            Product Type: {mosswickProductType}
+            Incoming Folder: {incomingBatchFolder}
 
             Received: {result.Received}
             Inserted: {result.Inserted}
             Already Present: {result.AlreadyPresent}
             Folders Created: {items.Count * 2}
+            Images Prepared: {items.Count}
             """;
         }
         catch (Exception ex)
@@ -280,7 +372,6 @@
             IsImporting = false;
         }
     }
-
  
 
     private void OnIncomingBatchFolderChanged(ChangeEventArgs e)
@@ -406,5 +497,186 @@
             .Select(record =>
                 mapper.Map(record, currentBatchId))
             .ToList();
+    }
+    private async Task<string> PrepareIncomingBatchFromManifestAsync(
+    IReadOnlyList<MockupManifestRecord> manifestRecords,
+    string batchId)
+    {
+        // Phase 1: Validate method inputs and selected files.
+
+        ArgumentNullException.ThrowIfNull(manifestRecords);
+
+        if (manifestRecords.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "The Mosswick manifest contains no records.");
+        }
+
+        if (string.IsNullOrWhiteSpace(batchId))
+        {
+            throw new ArgumentException(
+                "Batch ID is required.",
+                nameof(batchId));
+        }
+
+        if (mosswickSourceImages.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Select the Mosswick source image files before importing.");
+        }
+
+        var duplicateFileNames = mosswickSourceImages
+            .GroupBy(
+                file => Path.GetFileName(file.Name),
+                StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .OrderBy(
+                fileName => fileName,
+                StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (duplicateFileNames.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "Multiple selected files have the same filename: " +
+                string.Join(", ", duplicateFileNames));
+        }
+
+        // Phase 2 will begin here.
+
+        var selectedFilesByName = mosswickSourceImages
+            .ToDictionary(
+                file => Path.GetFileName(file.Name),
+                file => file,
+                StringComparer.OrdinalIgnoreCase);
+        
+        var mapper = new MockupManifestItemMapper();
+
+        const long maxImageSize =
+            100L * 1024L * 1024L;
+
+        var preparedImages = new List<(
+    string FolderName,
+    string SourceFileName,
+    IBrowserFile BrowserFile)>();
+
+        foreach (var record in manifestRecords)
+        {
+            if (string.IsNullOrWhiteSpace(record.SourceImageFile))
+            {
+                throw new InvalidOperationException(
+                    $"Manifest record '{record.ArtworkId}' " +
+                    "does not specify SourceImageFile.");
+            }
+
+            var sourceFileName = Path.GetFileName(
+                record.SourceImageFile.Replace('\\', '/'));
+
+            if (string.IsNullOrWhiteSpace(sourceFileName))
+            {
+                throw new InvalidOperationException(
+                    $"Manifest record '{record.ArtworkId}' " +
+                    "contains an invalid SourceImageFile.");
+            }
+
+            if (!selectedFilesByName.TryGetValue(
+                    sourceFileName,
+                    out var browserFile))
+            {
+                throw new InvalidOperationException(
+                    $"The source image '{sourceFileName}' referenced by " +
+                    $"artwork '{record.ArtworkId}' was not selected.");
+            }
+
+            var item = mapper.Map(record, batchId);
+
+            if (string.IsNullOrWhiteSpace(item.FolderName))
+            {
+                throw new InvalidOperationException(
+                    $"No input folder could be determined for " +
+                    $"artwork '{record.ArtworkId}'.");
+            }
+
+            var safeFolderName = Path.GetFileName(item.FolderName);
+
+            if (!string.Equals(
+                    safeFolderName,
+                    item.FolderName,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"The generated folder name '{item.FolderName}' is invalid.");
+            }
+            if (browserFile.Size > maxImageSize)
+            {
+                throw new InvalidOperationException(
+                    $"The source image '{sourceFileName}' exceeds " +
+                    "the maximum allowed size of 100 MB.");
+            }
+
+            preparedImages.Add((
+                safeFolderName,
+                sourceFileName,
+                browserFile));
+        }
+        // Phase 3: Prepare the incoming batch directories.
+
+        var incomingFolderName =
+            $"mosswick-{batchId}";
+
+        var incomingBatchRoot = Path.Combine(
+            "/incoming",
+            incomingFolderName);
+
+        var inputFoldersRoot = Path.Combine(
+            incomingBatchRoot,
+            "input_folders");
+
+        if (Directory.Exists(incomingBatchRoot))
+        {
+            Directory.Delete(
+                incomingBatchRoot,
+                recursive: true);
+        }
+
+        Directory.CreateDirectory(inputFoldersRoot);
+
+        // Phase 4 will begin here.
+        // Phase 4: Copy the validated source images.
+
+        foreach (var preparedImage in preparedImages)
+        {
+            var destinationFolder = Path.Combine(
+                inputFoldersRoot,
+                preparedImage.FolderName);
+
+            Directory.CreateDirectory(destinationFolder);
+
+            var destinationPath = Path.Combine(
+                destinationFolder,
+                preparedImage.SourceFileName);
+
+            await using var sourceStream =
+                preparedImage.BrowserFile.OpenReadStream(
+                    maxImageSize);
+
+            await using var destinationStream =
+                new FileStream(
+                    destinationPath,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None,
+                    bufferSize: 81920,
+                    useAsync: true);
+
+            await sourceStream.CopyToAsync(
+                destinationStream);
+
+            Console.WriteLine(
+                $"Prepared Mosswick source image: " +
+                $"'{destinationPath}'");
+        }
+        return incomingFolderName;
     }
 }

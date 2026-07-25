@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Components.Forms;
 using MockupWorkflow.Shared.Models;
+using MudBlazor.Charts;
 using System.Net.Http.Headers;
 
 namespace MockupWorkflow.Admin.Web.Services;
@@ -51,6 +52,11 @@ public class PngUploadService
             var folderName = Path.GetFileName(Path.GetDirectoryName(file));
             var fileName = Path.GetFileName(file);
 
+            if(string.IsNullOrWhiteSpace(folderName))
+{
+                throw new InvalidOperationException(
+                    "The required value was not provided.");
+            }
             var remotePath =
                 $"{batchId}/{productType}/input_folders/{Uri.EscapeDataString(folderName)}/{Uri.EscapeDataString(fileName)}";
 
