@@ -133,7 +133,7 @@ Shared business models, MongoDB collections, and workflow objects.
 
 REST API responsible for importing production records, managing batches, and coordinating workflow processing.
 
-### FolderCreator.API
+### FolderCreator.Api
 
 Creates and manages batch folder structures within the shared Docker volume.
 
@@ -176,3 +176,10 @@ The Batch Overview page provides operators with real-time visibility into workfl
        alt="Batch Overview"
        width="1000">
 </p>
+
+### Planned UI Improvements
+
+- Simplify the batch import experience
+- Separate specialized import workflows from the core platform
+- Improve onboarding for first-time users
+- Add guided validation and import progress feedback
