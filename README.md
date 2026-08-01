@@ -11,6 +11,10 @@ MockupWorkflow.Admin is the Blazor Server administration application for the Moc
 
 The application integrates with PhotoshopAutomation.Api and supporting platform services to coordinate batch processing, monitor workflow execution, and provide operational visibility across the automation pipeline.
 
+## Overview
+
+MockupWorkflow.Admin is the operational dashboard for the Mockup Workflow Platform. It enables operators to import production batches, monitor workflow execution, review processing status, diagnose failures, and manage automated Photoshop production workflows from a centralized Blazor Server application.
+
 ---
 
 ## Features
@@ -57,7 +61,7 @@ Following a successful import, the application automatically calls the FolderCre
 MockupWorkflow.Admin coordinates with the platform's backend services through REST APIs, including:
 
 - PhotoshopAutomation.Api
-- FolderCreator.Api
+- FolderCreator.API
 - PNGAPI
 - MongoDB
 
@@ -106,7 +110,7 @@ The administration application supports the complete operational workflow:
 |-----------|----------------|
 | **MockupWorkflow.Admin** | Blazor Server administration interface for operators |
 | **PhotoshopAutomation.Api** | Coordinates workflow execution and batch processing |
-| **FolderCreator.Api** | Creates standardized production folder structures |
+| **FolderCreator.API** | Creates standardized production folder structures |
 | **PNGAPI** | Manages input and generated asset storage |
 | **MongoDB** | Stores workflow records, batch metadata, and processing state |
 ---
@@ -133,7 +137,7 @@ Shared business models, MongoDB collections, and workflow objects.
 
 REST API responsible for importing production records, managing batches, and coordinating workflow processing.
 
-### FolderCreator.Api
+### FolderCreator.API
 
 Creates and manages batch folder structures within the shared Docker volume.
 
@@ -141,39 +145,52 @@ Creates and manages batch folder structures within the shared Docker volume.
 
 ## Current Workflow
 
-1. Import production records
-2. Generate Batch ID
-3. Save records to MongoDB
-4. Automatically create production folders
-5. View batches
-6. Generate Photoshop mockups *(in progress)*
-7. Upload generated assets *(planned)*
-8. Publish products *(planned)*
+1. Import production records.
+2. Generate a batch ID.
+3. Save workflow records to MongoDB.
+4. Automatically create production folders.
+5. Monitor batches and individual records.
+6. Generate Photoshop mockups through the UXP workflow engine.
+7. Upload generated assets through PNGAPI.
+8. Review completion status and processing errors.
+9. Prepare completed batches for downstream publishing.
 
 ---
 
 ## Project Status
 
-Actively under development.
+**Status:** Active Development / Portfolio Release
 
-Current focus includes:
+The core operational workflow is functional, including batch import, folder provisioning, workflow monitoring, Photoshop mockup processing, generated-asset uploads, and completion tracking.
 
-* Batch management
-* Photoshop automation integration
-* Automated asset generation
-* Production workflow tracking
+Current development is focused on:
+
+- Refining the administrative user experience
+- Expanding workflow integrations
+- Enhancing production monitoring and diagnostics
+- Supporting additional publishing and automation pipelines
 
 ---
 
 ## Screenshots
 
-### Batch Overview
+### Workflow Monitoring
 
-The Batch Overview page provides operators with real-time visibility into workflow execution, processing progress, and mockup generation status across an entire production batch.
+The Workflow Monitoring page provides operators with detailed visibility into batch progress, processing status, mockup generation, and item-level workflow execution.
 
 <p align="center">
   <img src="screenshots/batch-overview.png"
-       alt="Batch Overview"
+       alt="Workflow Monitoring"
+       width="1000">
+</p>
+
+### Batch List
+
+The Batch List provides a high-level operational view of all production batches, including product type, item counts, mockup progress, and last activity.
+
+<p align="center">
+  <img src="screenshots/batches.png"
+       alt="Batch List"
        width="1000">
 </p>
 

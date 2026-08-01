@@ -56,3 +56,6 @@ docker-compose.override.yml
 
 # Generated screenshots/videos
 screenshots/temp/
+
+# Local launch profiles (optional if not intentionally shared)
+launchSettings.local.json
