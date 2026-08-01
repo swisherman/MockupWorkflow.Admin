@@ -135,6 +135,8 @@ Shared business models, MongoDB collections, and workflow objects.
 
 ### PhotoshopAutomation.Api
 
+[swisherman/PhotoshopAutomation.Api](https://github.com/swisherman/PhotoshopAutomation.Api)
+
 REST API responsible for importing production records, managing batches, and coordinating workflow processing.
 
 ### FolderCreator.API
