@@ -17,6 +17,36 @@ MockupWorkflow.Admin is the operational dashboard for the Mockup Workflow Platfo
 
 ---
 
+## Screenshots
+
+### Workflow Monitoring
+
+The Workflow Monitoring page provides operators with detailed visibility into batch progress, processing status, mockup generation, and item-level workflow execution.
+
+<p align="center">
+  <img src="screenshots/batch-overview.png"
+       alt="Workflow Monitoring"
+       width="1000">
+</p>
+
+### Batch List
+
+The Batch List provides a high-level operational view of all production batches, including product type, item counts, mockup progress, and last activity.
+
+<p align="center">
+  <img src="screenshots/batches.png"
+       alt="Batch List"
+       width="1000">
+</p>
+
+### Planned UI Improvements
+
+- Simplify the batch import experience
+- Separate specialized import workflows from the core platform
+- Improve onboarding for first-time users
+- Add guided validation and import progress feedback
+
+
 ## Features
 
 ### Batch Import
@@ -174,31 +204,3 @@ Current development is focused on:
 
 ---
 
-## Screenshots
-
-### Workflow Monitoring
-
-The Workflow Monitoring page provides operators with detailed visibility into batch progress, processing status, mockup generation, and item-level workflow execution.
-
-<p align="center">
-  <img src="screenshots/batch-overview.png"
-       alt="Workflow Monitoring"
-       width="1000">
-</p>
-
-### Batch List
-
-The Batch List provides a high-level operational view of all production batches, including product type, item counts, mockup progress, and last activity.
-
-<p align="center">
-  <img src="screenshots/batches.png"
-       alt="Batch List"
-       width="1000">
-</p>
-
-### Planned UI Improvements
-
-- Simplify the batch import experience
-- Separate specialized import workflows from the core platform
-- Improve onboarding for first-time users
-- Add guided validation and import progress feedback
