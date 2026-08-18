@@ -27,18 +27,32 @@ public sealed class MockupManifestItemMapper
         var folderName =
             CreateFolderName(record.ArtworkId);
 
+        //return new PodItem
+        //{
+        //    BatchId = batchId,
+        //    ProductType = record.ProductType,
+        //    Phrase = record.ArtworkId,
+        //    FolderName = folderName,
+        //    ExpectedFolderName = folderName,
+        //    Filename = filename,
+        //    MockupRoot = "/data/builds",
+        //    SourceKey =
+        //        $"{batchId}:{record.ProductType}:{folderName}"
+        //};
         return new PodItem
         {
             BatchId = batchId,
             ProductType = record.ProductType,
+            SourceItemId = record.ArtworkId,
             Phrase = record.ArtworkId,
             FolderName = folderName,
             ExpectedFolderName = folderName,
             Filename = filename,
             MockupRoot = "/data/builds",
             SourceKey =
-                $"{batchId}:{record.ProductType}:{folderName}"
+        $"{batchId}:{record.ProductType}:{folderName}"
         };
+
     }
 
     private static string CreateFolderName(
